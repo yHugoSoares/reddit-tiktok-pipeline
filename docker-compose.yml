@@ -1,0 +1,18 @@
+services:
+  reddit-bot:
+    build: .
+    container_name: reddit-video-bot
+    env_file:
+      - .env
+    volumes:
+      - ./assets/backgrounds:/app/video_bot/assets/backgrounds
+      - ./assets/cookies:/app/video_bot/assets/cookies
+      - ./assets/background_audio:/app/video_bot/assets/backgrounds/audio
+      - ./results:/app/video_bot/results
+      - ./logs:/app/video_bot/logs
+      - ./state:/app/video_bot/state
+      # Mount config.toml AFTER first-time setup creates it.
+      # Run: touch config.toml && docker compose run --rm reddit-bot python main.py
+      # Then uncomment the line below for subsequent runs:
+      # - ./config.toml:/app/video_bot/config.toml
+    restart: "no"

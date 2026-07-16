@@ -1,0 +1,23 @@
+# RedditVideoMakerBot dependencies (minus torch/transformers — skip AI similarity)
+boto3>=1.36.0
+botocore>=1.36.0
+gTTS>=2.5.0
+moviepy>=2.2.0
+playwright>=1.49.0
+praw>=7.8.0
+requests>=2.32.0
+rich>=13.9.0
+toml>=0.10.2
+translators>=5.9.0
+pyttsx3>=2.98
+tomlkit>=0.13.0
+Flask>=3.1.0
+clean-text>=0.6.0
+unidecode>=1.4.0
+spacy>=3.8.0
+ffmpeg-python>=0.2.0
+elevenlabs>=1.57.0
+yt-dlp>=2025.10.0
+
+# Our additions
+python-dotenv>=1.0.0

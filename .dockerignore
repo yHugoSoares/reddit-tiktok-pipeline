@@ -1,0 +1,11 @@
+.env
+.git
+.gitignore
+*.md
+*.pyc
+__pycache__
+.DS_Store
+logs/
+results/
+state/
+assets/cookies/

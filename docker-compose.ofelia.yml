@@ -1,0 +1,27 @@
+# docker-compose.ofelia.yml — Optional Ofelia scheduler for 3 daily runs.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.ofelia.yml up -d
+#
+# Requires Docker socket access. Cron is the recommended scheduling method
+# for simplicity — use this if you cannot install host cron.
+
+services:
+  ofelia:
+    image: mcuadros/ofelia:latest
+    container_name: reddit-video-scheduler
+    depends_on:
+      - reddit-bot
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: daemon --docker
+    labels:
+      ofelia.job-run.morning.schedule: "0 9 * * *"
+      ofelia.job-run.morning.command: "docker compose -f /path/to/docker-compose.yml run --rm reddit-bot"
+      ofelia.job-run.afternoon.schedule: "0 14 * * *"
+      ofelia.job-run.afternoon.command: "docker compose -f /path/to/docker-compose.yml run --rm reddit-bot"
+      ofelia.job-run.evening.schedule: "0 19 * * *"
+      ofelia.job-run.evening.command: "docker compose -f /path/to/docker-compose.yml run --rm reddit-bot"
+
+# Note: Update the command paths above to match your project directory.
+# The scheduler uses cron-like syntax (server local time).

@@ -1,0 +1,11 @@
+.env
+config.toml
+assets/cookies/
+results/
+logs/
+state/
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+*.tmp
