@@ -64,7 +64,6 @@ COPY run_pipeline.py .
 COPY rewrite_story.py .
 COPY subtitle_generator.py .
 COPY upload_tiktok.py .
-COPY state/ ./state/
 COPY scripts/ ./scripts/
 
 CMD ["python3", "run_pipeline.py"]
