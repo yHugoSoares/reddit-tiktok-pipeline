@@ -1,6 +1,7 @@
 .env
 config.toml
 assets/cookies/
+assets/backgrounds/*.mp4
 results/
 logs/
 state/

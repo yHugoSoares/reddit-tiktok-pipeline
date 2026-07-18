@@ -67,6 +67,7 @@ COPY subtitle_generator.py .
 COPY upload_tiktok.py .
 COPY upload_instagram.py .
 COPY upload_youtube.py .
+COPY test_pipeline.py .
 COPY scripts/ ./scripts/
 
 CMD ["python3", "run_pipeline.py"]
