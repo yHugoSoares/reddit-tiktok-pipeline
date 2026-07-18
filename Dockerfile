@@ -61,9 +61,12 @@ COPY video_bot/ .
 
 # ── Layer 6: our new pipeline files (overlay on top) ──
 COPY run_pipeline.py .
+COPY init_config.py .
 COPY rewrite_story.py .
 COPY subtitle_generator.py .
 COPY upload_tiktok.py .
+COPY upload_instagram.py .
+COPY upload_youtube.py .
 COPY scripts/ ./scripts/
 
 CMD ["python3", "run_pipeline.py"]

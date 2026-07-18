@@ -49,10 +49,18 @@ logger = logging.getLogger(__name__)
 DRY_RUN = os.environ.get("DRY_RUN", "true").lower() == "true"
 POSTS_PER_DAY = int(os.environ.get("POSTS_PER_DAY", "1"))
 TIKTOK_ACCOUNTNAME = os.environ.get("TIKTOK_ACCOUNTNAME", "").strip()
+INSTAGRAM_USERNAME = os.environ.get("INSTAGRAM_USERNAME", "").strip()
+INSTAGRAM_PASSWORD = os.environ.get("INSTAGRAM_PASSWORD", "").strip()
+
+# Platforms enabled for upload
+PLATFORMS = os.environ.get("PLATFORMS", "tiktok,instagram,youtube").lower().split(",")
+PLATFORMS = [p.strip() for p in PLATFORMS if p.strip()]
+if DRY_RUN:
+    PLATFORMS = []
 
 logger.info(
-    "Starting pipeline | DRY_RUN=%s | POSTS_PER_DAY=%s | ACCOUNT=%s",
-    DRY_RUN, POSTS_PER_DAY, TIKTOK_ACCOUNTNAME or "(not set)",
+    "Starting pipeline | DRY_RUN=%s | POSTS_PER_DAY=%s | PLATFORMS=%s",
+    DRY_RUN, POSTS_PER_DAY, ", ".join(PLATFORMS) or "none (dry-run)",
 )
 
 # ---------------------------------------------------------------------------
@@ -194,6 +202,10 @@ def discover_local_backgrounds():
 # ---------------------------------------------------------------------------
 
 def main():
+    # ---- 0. Auto-generate config if missing ----
+    from init_config import generate as init_config
+    init_config()
+
     # ---- 1. Daily limit check ----
     check_daily_limit()
 
@@ -358,41 +370,81 @@ def main():
 
     logger.info("Video generated: %s (%d bytes)", latest_video, video_size)
 
-    # ---- 11. Caption ----
-    caption = select_caption(reddit_id)
+    # ---- 11. Captions ----
+    tiktok_caption = select_caption(reddit_id)
+    instagram_caption = f"{select_caption(reddit_id)}\n\n#reddit #storytime #aita #redditstories"
+    youtube_title = f"Reddit Story: {hook[:90]}"
+    youtube_description = f"{hook}\n\n#reddit #storytime #shorts"
 
     # ---- 12. Dry-run or upload ----
-    if DRY_RUN:
+    if DRY_RUN or not PLATFORMS:
         logger.info("=" * 60)
-        logger.info("[DRY RUN] — video would be uploaded as follows:")
-        logger.info("  Video:   %s", latest_video)
-        logger.info("  Caption: %s", caption)
-        logger.info("  Account: %s", TIKTOK_ACCOUNTNAME or "(not set)")
+        logger.info("[DRY RUN] — video would be uploaded:")
+        logger.info("  Video:    %s", latest_video)
+        logger.info("  TikTok:   %s", tiktok_caption)
+        logger.info("  Instagram:%s", instagram_caption[:80])
+        logger.info("  YouTube:  %s", youtube_title)
         logger.info("=" * 60)
-        mark_posted(reddit_id, subreddit_name, caption, bg_name, latest_video)
+        mark_posted(reddit_id, subreddit_name, "dry-run", bg_name, latest_video)
         from utils.cleanup import cleanup
         cleanup(reddit_id)
         sys.exit(0)
 
-    # ---- 13. Upload to TikTok ----
-    logger.info("Uploading to TikTok...")
-    from upload_tiktok import upload_video
+    # ---- 13. Upload to all platforms ----
+    video_abs = os.path.abspath(latest_video)
+    uploaded_any = False
+    results = {}
 
-    success = upload_video(
-        video_path=os.path.abspath(latest_video),
-        caption=caption,
-        accountname=TIKTOK_ACCOUNTNAME,
-    )
+    # TikTok
+    if "tiktok" in PLATFORMS and TIKTOK_ACCOUNTNAME:
+        logger.info("Uploading to TikTok...")
+        from upload_tiktok import upload_video
+        try:
+            results["tiktok"] = upload_video(video_abs, tiktok_caption, TIKTOK_ACCOUNTNAME)
+            uploaded_any = uploaded_any or results["tiktok"]
+        except Exception as e:
+            logger.error("TikTok upload error: %s", e)
+            results["tiktok"] = False
 
-    if not success:
-        logger.error("TikTok upload failed. Story NOT marked as posted.")
+    # Instagram
+    if "instagram" in PLATFORMS and INSTAGRAM_USERNAME and INSTAGRAM_PASSWORD:
+        logger.info("Uploading to Instagram...")
+        from upload_instagram import upload_to_instagram
+        try:
+            results["instagram"] = upload_to_instagram(
+                video_abs, instagram_caption, INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD
+            )
+            uploaded_any = uploaded_any or results["instagram"]
+        except Exception as e:
+            logger.error("Instagram upload error: %s", e)
+            results["instagram"] = False
+
+    # YouTube
+    if "youtube" in PLATFORMS:
+        logger.info("Uploading to YouTube...")
+        from upload_youtube import upload_to_youtube
+        try:
+            results["youtube"] = upload_to_youtube(
+                video_abs,
+                title=youtube_title,
+                description=youtube_description,
+            )
+            uploaded_any = uploaded_any or results["youtube"]
+        except Exception as e:
+            logger.error("YouTube upload error: %s", e)
+            results["youtube"] = False
+
+    logger.info("Upload results: %s", json.dumps(results))
+
+    if not uploaded_any:
+        logger.error("No successful uploads. Story NOT marked as posted.")
         sys.exit(1)
 
     # ---- 14. Finalize ----
-    mark_posted(reddit_id, subreddit_name, caption, bg_name, latest_video)
+    mark_posted(reddit_id, subreddit_name, str(results), bg_name, latest_video)
     from utils.cleanup import cleanup
     cleanup(reddit_id)
-    logger.info("Pipeline completed successfully!")
+    logger.info("Pipeline completed! Results: %s", json.dumps(results))
 
 
 if __name__ == "__main__":

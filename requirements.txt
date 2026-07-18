@@ -21,3 +21,11 @@ yt-dlp>=2025.10.0
 
 # Our additions
 python-dotenv>=1.0.0
+
+# Instagram upload
+instagrapi>=2.0.0
+
+# YouTube upload
+google-api-python-client>=2.0.0
+google-auth-oauthlib>=1.0.0
+google-auth-httplib2>=0.2.0
