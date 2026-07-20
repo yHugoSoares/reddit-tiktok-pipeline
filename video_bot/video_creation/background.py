@@ -143,7 +143,9 @@ def chop_background(background_config: Dict[str, Tuple], video_length: int, redd
         background_audio.write_audiofile(f"assets/temp/{thread_id}/background.mp3")
 
     print_step("Finding a spot in the backgrounds video to chop...✂️")
-    video_choice = f"{background_config['video'][2]}-{background_config['video'][1]}"
+    credit = background_config['video'][2]
+    fname = background_config['video'][1]
+    video_choice = f"{credit}-{fname}" if credit else fname
     background_video = VideoFileClip(f"assets/backgrounds/video/{video_choice}")
     start_time_video, end_time_video = get_start_and_end_times(
         video_length, background_video.duration
@@ -186,7 +188,7 @@ def register_local_backgrounds():
         key = mp4.stem
         if key not in background_options["video"]:
             # Tuple format: (uri_or_empty, filename, credit, position)
-            background_options["video"][key] = ("", mp4.name, "local", "center")
+            background_options["video"][key] = ("", mp4.name, "", "center")
 
 
 # Create a tuple for downloads background (background_audio_options, background_video_options)
