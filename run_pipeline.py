@@ -210,16 +210,9 @@ def main():
     check_daily_limit()
 
     # ---- 2. Initialize upstream config ----
+    import toml as _toml
     from utils import settings
-
-    config_dir = Path.cwd()
-    config = settings.check_toml(
-        str(config_dir / "utils" / ".config.template.toml"),
-        str(config_dir / "config.toml"),
-    )
-    if config is False:
-        logger.error("Config validation failed. Run interactive setup first: touch config.toml && docker compose run --rm -v \"$(pwd)/config.toml:/app/video_bot/config.toml\" reddit-bot python main.py")
-        sys.exit(1)
+    settings.config = _toml.load("config.toml")
 
     # Force story mode (we always narrate post selftext, not comments)
     settings.config["settings"]["storymode"] = True

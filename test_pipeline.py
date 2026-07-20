@@ -66,19 +66,13 @@ def atomic_write_json(path, data):
 
 # ── Main ──
 def main():
-    # Init config
+    # Init config — generate from .env, load directly (skip interactive prompts)
     from init_config import generate
     generate()
 
+    import toml as _toml
     from utils import settings
-    config_dir = Path.cwd()
-    config = settings.check_toml(
-        str(config_dir / "utils" / ".config.template.toml"),
-        str(config_dir / "config.toml"),
-    )
-    if config is False:
-        logger.error("Config failed. Check your .env vars.")
-        sys.exit(1)
+    settings.config = _toml.load("config.toml")
 
     settings.config["settings"]["storymode"] = True
     settings.config["settings"]["storymodemethod"] = 1

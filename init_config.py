@@ -28,10 +28,7 @@ def generate():
     if missing:
         print(f"Missing required env vars: {', '.join(missing)}")
         print("Set them in .env or your environment, then re-run.")
-        print("Falling back to interactive setup...")
-        from utils import settings
-        settings.check_toml("utils/.config.template.toml", "config.toml")
-        return
+        sys.exit(1)
 
     subreddit = os.environ.get("REDDIT_SUBREDDIT", "AmItheAsshole")
     tts_choice = os.environ.get("TTS_CHOICE", "EdgeTTS")
