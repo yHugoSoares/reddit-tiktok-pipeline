@@ -34,11 +34,12 @@ def generate():
         return
 
     subreddit = os.environ.get("REDDIT_SUBREDDIT", "AmItheAsshole")
-    tts_choice = os.environ.get("TTS_CHOICE", "googletranslate")
+    tts_choice = os.environ.get("TTS_CHOICE", "EdgeTTS")
     story_max = int(os.environ.get("STORY_MAX_LENGTH", "10000"))
     background = os.environ.get("BACKGROUND_VIDEO", "")
     elevenlabs_key = os.environ.get("ELEVENLABS_API_KEY", "")
     elevenlabs_voice = os.environ.get("ELEVENLABS_VOICE_ID", "Bella")
+    edge_voice = os.environ.get("EDGE_VOICE", "en-US-AriaNeural")
 
     config = f'''[reddit.creds]
 client_id = "{os.environ['REDDIT_CLIENT_ID']}"
@@ -89,6 +90,7 @@ voice_choice = "{tts_choice}"
 random_voice = false
 elevenlabs_voice_name = "{elevenlabs_voice}"
 elevenlabs_api_key = "{elevenlabs_key}"
+edge_voice = "{edge_voice}"
 aws_polly_voice = "Matthew"
 streamlabs_polly_voice = "Matthew"
 tiktok_voice = "en_us_001"
