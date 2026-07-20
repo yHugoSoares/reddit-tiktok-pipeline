@@ -17,10 +17,31 @@ class elevenlabs:
         if random_voice:
             voice = self.randomvoice()
         else:
-            voice = str(settings.config["settings"]["tts"]["elevenlabs_voice_name"]).capitalize()
+            voice = settings.config["settings"]["tts"]["elevenlabs_voice_name"]
+            # Don't capitalize voice IDs (e.g. "NOpBlnGInO9m6vDvFkFC")
+            if not any(c.isdigit() for c in voice):
+                voice = voice.capitalize()
 
-        audio = self.client.generate(text=text, voice=voice, model="eleven_multilingual_v1")
-        save(audio=audio, filename=filepath)
+        # Try new API first, fall back to legacy generate()
+        try:
+            audio = self.client.text_to_speech.convert(
+                text=text,
+                voice_id=voice,
+                model_id="eleven_v3",
+                language_code="en",
+            )
+            # audio is a generator of bytes — write to file
+            with open(filepath, "wb") as f:
+                for chunk in audio:
+                    f.write(chunk)
+        except Exception:
+            audio = self.client.generate(
+                text=text,
+                voice=voice,
+                model="eleven_multilingual_v1",
+            )
+            from elevenlabs import save
+            save(audio=audio, filename=filepath)
 
     def initialize(self):
         if settings.config["settings"]["tts"]["elevenlabs_api_key"]:

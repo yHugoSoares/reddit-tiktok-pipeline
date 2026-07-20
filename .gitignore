@@ -2,6 +2,8 @@
 config.toml
 assets/cookies/
 assets/backgrounds/*.mp4
+assets/backgrounds/video/
+assets/background_audio/
 results/
 logs/
 state/

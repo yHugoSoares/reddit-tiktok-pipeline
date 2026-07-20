@@ -37,6 +37,8 @@ def generate():
     tts_choice = os.environ.get("TTS_CHOICE", "googletranslate")
     story_max = int(os.environ.get("STORY_MAX_LENGTH", "10000"))
     background = os.environ.get("BACKGROUND_VIDEO", "")
+    elevenlabs_key = os.environ.get("ELEVENLABS_API_KEY", "")
+    elevenlabs_voice = os.environ.get("ELEVENLABS_VOICE_ID", "Bella")
 
     config = f'''[reddit.creds]
 client_id = "{os.environ['REDDIT_CLIENT_ID']}"
@@ -85,8 +87,8 @@ background_thumbnail_font_color = "255,255,255"
 [settings.tts]
 voice_choice = "{tts_choice}"
 random_voice = false
-elevenlabs_voice_name = "Bella"
-elevenlabs_api_key = ""
+elevenlabs_voice_name = "{elevenlabs_voice}"
+elevenlabs_api_key = "{elevenlabs_key}"
 aws_polly_voice = "Matthew"
 streamlabs_polly_voice = "Matthew"
 tiktok_voice = "en_us_001"
