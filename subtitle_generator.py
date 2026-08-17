@@ -138,3 +138,139 @@ def render_title_overlay(
 
     img.save(output_path)
     return output_path
+
+
+# ---------------------------------------------------------------------------
+# Reactive (karaoke) subtitles — highlight each word while it is spoken
+# ---------------------------------------------------------------------------
+
+_ACCENT = (255, 190, 60, 255)  # golden — pops against any gameplay
+
+
+def _wrap_tokens(tokens, wrap_width):
+    """Wrap a token list into lines of ~wrap_width characters, keeping token order."""
+    lines, cur, cur_len = [], [], 0
+    for tok in tokens:
+        add = len(tok) + (1 if cur else 0)
+        if cur and cur_len + add > wrap_width:
+            lines.append(cur)
+            cur, cur_len = [tok], len(tok)
+        else:
+            cur.append(tok)
+            cur_len += add
+    if cur:
+        lines.append(cur)
+    return lines
+
+
+def _render_token_line(draw, font, line, y, highlight_index=None, fill=(255, 255, 255, 255)):
+    """Draw one wrapped line; optionally highlight the token at highlight_index."""
+    x = 0
+    for idx, tok in enumerate(line):
+        tok_fill = _ACCENT if idx == highlight_index else fill
+        w = draw.textlength(tok + " ", font=font)
+        for dx, dy in [(-3, -3), (-3, 3), (3, -3), (3, 3), (0, -3), (0, 3), (-3, 0), (3, 0)]:
+            draw.text((x + dx, y + dy), tok, font=font, fill=(0, 0, 0, 180))
+        draw.text((x, y), tok, font=font, fill=tok_fill)
+        x += w
+    return x
+
+
+def generate_karaoke_clips(
+    reddit_id: str,
+    sentences: list,
+    word_timings: list,
+    sentence_durations: list,
+    output_dir: str,
+    resolution: tuple = (1080, 1920),
+    font_path: str = "fonts/Roboto-Bold.ttf",
+    font_size: int = 68,
+    wrap_width: int = 20,
+):
+    """Build one karaoke video clip per sentence.
+
+    Each word is rendered as its own frame (current word highlighted in
+    golden), and the frames are concatenated with the exact timing from
+    edge-tts so the highlight follows the narration.
+
+    Args:
+        reddit_id: Reddit post ID (temp folder).
+        sentences: Body sentences (parallel to postaudio-N.mp3).
+        word_timings: List of [[start_s, end_s, word], ...] per sentence.
+        sentence_durations: Audio duration in seconds per sentence.
+        output_dir: Directory to write clips into.
+    """
+    import json
+    import os
+    import subprocess
+    from PIL import Image, ImageDraw, ImageFont
+
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    font = ImageFont.truetype(font_path, font_size)
+    img_w, img_h = resolution
+
+    clips = []
+    for i, (sentence, timings, dur) in enumerate(zip(sentences, word_timings, sentence_durations)):
+        if not timings or dur <= 0:
+            continue
+        tokens = [t[2] for t in timings]
+        raw_durs = [max(t[1] - t[0], 0.05) for t in timings]
+        # Scale so the frames exactly fill the sentence audio duration
+        total_raw = sum(raw_durs)
+        factor = dur / total_raw if total_raw > 0 else 1.0
+        durs = [d * factor for d in raw_durs]
+        if durs:
+            durs[-1] = dur - sum(durs[:-1])
+
+        lines = _wrap_tokens(tokens, wrap_width)
+        line_height = font_size + 12
+        total_height = len(lines) * line_height
+        start_y = img_h - total_height - 180
+
+        # Token -> (line_idx, col_idx) mapping
+        token_pos = {}
+        pos = 0
+        for li, line in enumerate(lines):
+            for ci, tok in enumerate(line):
+                token_pos[pos] = (li, ci)
+                pos += 1
+
+        png_dir = os.path.join(output_dir, f"s{i}_frames")
+        Path(png_dir).mkdir(parents=True, exist_ok=True)
+        frames = []
+        concat_lines = ["ffconcat version 1.0"]
+        for j, (tok, d) in enumerate(zip(tokens, durs)):
+            frame_path = os.path.join(png_dir, f"w{j}.png")
+            img = Image.new("RGBA", resolution, (0, 0, 0, 0))
+            draw = ImageDraw.Draw(img)
+            y = start_y
+            hi_li, hi_ci = token_pos.get(j, (0, -1))
+            for li, line in enumerate(lines):
+                _render_token_line(draw, font, line, y, highlight_index=hi_ci if li == hi_li else None)
+                y += line_height
+            img.save(frame_path)
+            frames.append(frame_path)
+            # Relative paths (concat demuxer resolves them against the list file)
+            concat_lines.append(f"file s{i}_frames/w{j}.png")
+            concat_lines.append(f"duration {d:.4f}")
+
+        # Last frame must hold until the clip ends
+        if frames:
+            concat_lines.append(f"file s{i}_frames/w{len(frames) - 1}.png")
+            concat_lines.append("duration 0.001")
+
+        list_file = os.path.join(output_dir, f"s{i}.txt")
+        with open(list_file, "w", encoding="utf-8") as f:
+            f.write("\n".join(concat_lines))
+
+        clip_path = os.path.join(output_dir, f"s{i}.mkv")
+        # PNG codec in MKV preserves the alpha channel for later overlay
+        cmd = [
+            "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+            "-f", "concat", "-safe", "0", "-i", f"s{i}.txt",
+            "-c:v", "png", f"s{i}.mkv",
+        ]
+        subprocess.run(cmd, check=True, cwd=output_dir)
+        clips.append(clip_path)
+
+    return clips

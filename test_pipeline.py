@@ -168,6 +168,10 @@ def process_story(story_title: str, story_body: str, story_index: int):
         shutil.rmtree(temp_png)
     generate_subtitle_overlays(reddit_id, body_sentences, temp_png)
 
+    logger.info("Story %d: karaoke clips...", story_index + 1)
+    from karaoke_generator import generate_karaoke_for_reddit
+    generate_karaoke_for_reddit(reddit_id, body_sentences)
+
     logger.info("Story %d: background...", story_index + 1)
     from video_creation.background import (
         chop_background, download_background_audio,

@@ -229,6 +229,11 @@ def run_pipeline(job_id, reddit_url, youtube_url, story_title="", story_body="")
         generate_subtitle_overlays(reddit_id, body_sentences, temp_png)
         log(job_id, f"{len(body_sentences)} subtitle overlays")
 
+        from karaoke_generator import generate_karaoke_for_reddit
+        n_karaoke = generate_karaoke_for_reddit(reddit_id, body_sentences)
+        if n_karaoke:
+            log(job_id, f"Reactive subtitles: {n_karaoke} sentence clips")
+
         # 6. background
         from video_creation.background import (
             chop_background, download_background_audio,

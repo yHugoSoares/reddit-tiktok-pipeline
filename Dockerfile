@@ -64,6 +64,7 @@ COPY run_pipeline.py .
 COPY init_config.py .
 COPY rewrite_story.py .
 COPY subtitle_generator.py .
+COPY karaoke_generator.py .
 COPY upload_tiktok.py .
 COPY upload_instagram.py .
 COPY upload_youtube.py .

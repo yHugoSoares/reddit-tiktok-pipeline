@@ -309,6 +309,12 @@ def main():
     )
     logger.info("Generated %d subtitle overlays.", len(body_sentences))
 
+    # ---- 7b. Reactive (karaoke) subtitle clips from edge-tts word timings ----
+    from karaoke_generator import generate_karaoke_for_reddit
+    n_karaoke = generate_karaoke_for_reddit(reddit_id, body_sentences)
+    if n_karaoke:
+        logger.info("Reactive subtitles enabled for %d sentences.", n_karaoke)
+
     # ---- 8. Background setup ----
     logger.info("Setting up background...")
     from video_creation.background import (

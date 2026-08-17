@@ -322,18 +322,36 @@ def make_final_video(
             )
             current_time += audio_clips_durations[0]
         elif settings.config["settings"]["storymodemethod"] == 1:
+            karaoke_dir = f"assets/temp/{reddit_id}/karaoke"
+            has_karaoke = Path(karaoke_dir).is_dir()
             for i in track(range(0, number_of_clips + 1), "Collecting the image files..."):
-                image_clips.append(
-                    ffmpeg.input(f"assets/temp/{reddit_id}/png/img{i}.png")["v"].filter(
-                        "scale", screenshot_width, -1
+                # Loop index 0 = title card; body sentence j is at index j+1
+                karaoke_idx = i - 1
+                if has_karaoke and i > 0 and exists(f"{karaoke_dir}/s{karaoke_idx}.mkv"):
+                    # Reactive subtitles: a per-sentence karaoke clip that
+                    # highlights each word as it is spoken.
+                    clip = (
+                        ffmpeg.input(f"{karaoke_dir}/s{karaoke_idx}.mkv")["v"]
+                        .filter("scale", screenshot_width, -1)
+                        .filter("setpts", f"PTS-STARTPTS+{current_time}/TB")
                     )
-                )
-                background_clip = background_clip.overlay(
-                    image_clips[i],
-                    enable=f"between(t,{current_time},{current_time + audio_clips_durations[i]})",
-                    x="(main_w-overlay_w)/2",
-                    y="(main_h-overlay_h)/2",
-                )
+                    background_clip = background_clip.overlay(
+                        clip,
+                        x="(main_w-overlay_w)/2",
+                        y="(main_h-overlay_h)/2",
+                    )
+                else:
+                    image_clips.append(
+                        ffmpeg.input(f"assets/temp/{reddit_id}/png/img{i}.png")["v"].filter(
+                            "scale", screenshot_width, -1
+                        )
+                    )
+                    background_clip = background_clip.overlay(
+                        image_clips[i],
+                        enable=f"between(t,{current_time},{current_time + audio_clips_durations[i]})",
+                        x="(main_w-overlay_w)/2",
+                        y="(main_h-overlay_h)/2",
+                    )
                 current_time += audio_clips_durations[i]
     else:
         for i in range(0, number_of_clips + 1):
