@@ -15,16 +15,16 @@ def generate_subtitle_overlays(
     output_dir: str,
     resolution: tuple = (1080, 1920),
     font_path: str = "fonts/Roboto-Bold.ttf",
-    font_size: int = 68,
+    font_size: int = 150,
     text_color: tuple = (255, 255, 255, 255),
-    shadow_color: tuple = (0, 0, 0, 180),
+    shadow_color: tuple = (0, 0, 0, 255),
     bg_color: tuple = (0, 0, 0, 0),
-    wrap_width: int = 20,
+    wrap_width: int = 14,
 ) -> list:
     """Generate timed subtitle overlay PNGs for each sentence.
 
-    Images are RGBA with transparent background, white text,
-    and black shadow for readability over any gameplay background.
+    Images are RGBA with transparent background, big bold white text,
+    and a thick black outline — the classic TikTok caption style.
 
     Args:
         reddit_id: Reddit post ID (for naming).
@@ -34,7 +34,7 @@ def generate_subtitle_overlays(
         font_path: Path to TTF font file.
         font_size: Font size in points.
         text_color: RGBA tuple for main text.
-        shadow_color: RGBA tuple for text shadow/outline.
+        shadow_color: RGBA tuple for outline.
         bg_color: RGBA tuple for background.
         wrap_width: Characters per line before wrapping.
 
@@ -46,6 +46,7 @@ def generate_subtitle_overlays(
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     font = ImageFont.truetype(font_path, font_size)
     img_w, img_h = resolution
+    stroke_width = max(8, font_size // 12)
 
     overlay_paths = []
 
@@ -63,11 +64,11 @@ def generate_subtitle_overlays(
             continue
 
         # Calculate text block dimensions
-        line_height = font_size + 12
+        line_height = font_size + 20
         total_height = len(lines) * line_height
 
         # Position in lower third (TikTok-safe area, above any UI elements)
-        start_y = img_h - total_height - 180
+        start_y = img_h - total_height - 220
 
         # Draw each line centered horizontally
         for line in lines:
@@ -75,15 +76,9 @@ def generate_subtitle_overlays(
             line_width = bbox[2] - bbox[0]
             x = (img_w - line_width) // 2
 
-            # Draw shadow/outline (8 directions for readability)
-            for dx, dy in [
-                (-3, -3), (-3, 3), (3, -3), (3, 3),
-                (0, -3), (0, 3), (-3, 0), (3, 0),
-            ]:
-                draw.text((x + dx, start_y + dy), line, font=font, fill=shadow_color)
-
-            # Draw main text
-            draw.text((x, start_y), line, font=font, fill=text_color)
+            # Thick black outline (TikTok caption look)
+            draw.text((x, start_y), line, font=font, fill=text_color,
+                      stroke_width=stroke_width, stroke_fill=shadow_color)
             start_y += line_height
 
         filepath = os.path.join(output_dir, f"img{i}.png")
@@ -163,16 +158,17 @@ def _wrap_tokens(tokens, wrap_width):
     return lines
 
 
-def _render_token_line(draw, font, line, y, highlight_index=None, fill=(255, 255, 255, 255)):
-    """Draw one wrapped line; optionally highlight the token at highlight_index."""
-    x = 0
+def _render_token_line(draw, font, line, y, img_w, highlight_index=None, fill=(255, 255, 255, 255), stroke_width=12):
+    """Draw one wrapped line, centered; optionally highlight the token at highlight_index."""
+    # Measure the full line width first so we can center it (no trailing space)
+    widths = [draw.textlength(tok, font=font) for tok in line]
+    total_w = sum(widths) + (len(line) - 1) * draw.textlength(" ", font=font)
+    x = max((img_w - total_w) // 2, 0)
     for idx, tok in enumerate(line):
         tok_fill = _ACCENT if idx == highlight_index else fill
-        w = draw.textlength(tok + " ", font=font)
-        for dx, dy in [(-3, -3), (-3, 3), (3, -3), (3, 3), (0, -3), (0, 3), (-3, 0), (3, 0)]:
-            draw.text((x + dx, y + dy), tok, font=font, fill=(0, 0, 0, 180))
-        draw.text((x, y), tok, font=font, fill=tok_fill)
-        x += w
+        draw.text((x, y), tok, font=font, fill=tok_fill,
+                  stroke_width=stroke_width, stroke_fill=(0, 0, 0, 255))
+        x += widths[idx] + draw.textlength(" ", font=font)
     return x
 
 
@@ -184,8 +180,8 @@ def generate_karaoke_clips(
     output_dir: str,
     resolution: tuple = (1080, 1920),
     font_path: str = "fonts/Roboto-Bold.ttf",
-    font_size: int = 68,
-    wrap_width: int = 20,
+    font_size: int = 150,
+    wrap_width: int = 10,
 ):
     """Build one karaoke video clip per sentence.
 
@@ -208,6 +204,7 @@ def generate_karaoke_clips(
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     font = ImageFont.truetype(font_path, font_size)
     img_w, img_h = resolution
+    stroke_width = max(10, font_size // 10)
 
     clips = []
     for i, (sentence, timings, dur) in enumerate(zip(sentences, word_timings, sentence_durations)):
@@ -223,9 +220,9 @@ def generate_karaoke_clips(
             durs[-1] = dur - sum(durs[:-1])
 
         lines = _wrap_tokens(tokens, wrap_width)
-        line_height = font_size + 12
+        line_height = font_size + 22
         total_height = len(lines) * line_height
-        start_y = img_h - total_height - 180
+        start_y = img_h - total_height - 220
 
         # Token -> (line_idx, col_idx) mapping
         token_pos = {}
@@ -246,7 +243,9 @@ def generate_karaoke_clips(
             y = start_y
             hi_li, hi_ci = token_pos.get(j, (0, -1))
             for li, line in enumerate(lines):
-                _render_token_line(draw, font, line, y, highlight_index=hi_ci if li == hi_li else None)
+                _render_token_line(draw, font, line, y, img_w,
+                                   highlight_index=hi_ci if li == hi_li else None,
+                                   stroke_width=stroke_width)
                 y += line_height
             img.save(frame_path)
             frames.append(frame_path)
