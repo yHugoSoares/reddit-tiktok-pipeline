@@ -68,6 +68,10 @@ COPY upload_tiktok.py .
 COPY upload_instagram.py .
 COPY upload_youtube.py .
 COPY test_pipeline.py .
+COPY app.py .
+COPY templates/ ./templates/
 COPY scripts/ ./scripts/
 
-CMD ["python3", "run_pipeline.py"]
+EXPOSE 5000
+
+CMD ["python3", "app.py"]

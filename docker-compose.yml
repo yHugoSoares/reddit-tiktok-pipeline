@@ -4,6 +4,8 @@ services:
     container_name: reddit-video-bot
     env_file:
       - .env
+    ports:
+      - "5070:5070"
     volumes:
       - ./assets/backgrounds:/app/video_bot/assets/backgrounds
       - ./assets/cookies:/app/video_bot/assets/cookies

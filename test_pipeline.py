@@ -212,13 +212,24 @@ def main():
     if settings.config["settings"].get("storymode_max_length", 1000) < 5000:
         settings.config["settings"]["storymode_max_length"] = 5000
 
-    for i, story in enumerate(STORIES):
+    # STORY_INDEX env var: generate only one specific story (0-based).
+    story_index = os.environ.get("STORY_INDEX")
+    stories = STORIES
+    if story_index is not None:
+        idx = int(story_index)
+        if idx < 0 or idx >= len(STORIES):
+            logger.error("STORY_INDEX %d out of range (0..%d)", idx, len(STORIES) - 1)
+            sys.exit(1)
+        stories = [STORIES[idx]]
+        logger.info("STORY_INDEX set: processing only story %d.", idx)
+
+    for i, story in enumerate(stories):
         logger.info("=" * 50)
-        logger.info("PROCESSING STORY %d/%d", i + 1, len(STORIES))
+        logger.info("PROCESSING STORY %d/%d", i + 1, len(stories))
         logger.info("=" * 50)
         process_story(story["title"], story["body"], i)
 
-    logger.info("DONE — %d videos generated.", len(STORIES))
+    logger.info("DONE — %d video(s) generated.", len(stories))
 
 
 if __name__ == "__main__":

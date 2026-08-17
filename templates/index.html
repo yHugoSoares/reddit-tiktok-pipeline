@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reddit Story Video Studio</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --panel: #1a1d27;
+      --border: #2a2e3d;
+      --text: #e6e8ee;
+      --muted: #8b90a3;
+      --accent: #e85d75;
+      --green: #4ade80;
+      --red: #f87171;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+    }
+    .wrap { max-width: 960px; margin: 0 auto; padding: 32px 20px; }
+    h1 { font-size: 24px; margin-bottom: 6px; }
+    .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+    input[type="text"] {
+      width: 100%;
+      padding: 12px 14px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 15px;
+      margin-bottom: 16px;
+    }
+    input[type="text"]:focus { outline: none; border-color: var(--accent); }
+    button {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 24px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .status { margin-top: 16px; font-size: 14px; font-weight: 600; }
+    .status.running { color: var(--accent); }
+    .status.done { color: var(--green); }
+    .status.error { color: var(--red); }
+    .logbox {
+      background: #0b0d12;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      font-family: "SF Mono", Menlo, Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      height: 320px;
+      overflow-y: auto;
+      margin-top: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .logbox .err { color: var(--red); }
+    .result a {
+      color: var(--green);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .videos table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .videos td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+    .videos tr:hover td { background: rgba(255,255,255,0.03); }
+    .muted { color: var(--muted); font-size: 12px; }
+    .err { color: var(--red); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>🎬 Reddit Story Video Studio</h1>
+    <p class="subtitle">Paste a Reddit post URL and a YouTube background URL — get a narrated, subtitled vertical video.</p>
+
+    <div class="panel">
+      <label for="reddit_url">Reddit post URL <span class="muted">(needs API creds in .env — otherwise paste text below)</span></label>
+      <input type="text" id="reddit_url" placeholder="https://www.reddit.com/r/AmItheAsshole/comments/...">
+      <label for="youtube_url">YouTube background video URL <span class="muted">(optional — uses existing background if empty)</span></label>
+      <input type="text" id="youtube_url" placeholder="https://www.youtube.com/watch?v=...">
+      <label for="story_title">Or paste story — title <span class="muted">(optional)</span></label>
+      <input type="text" id="story_title" placeholder="AITA for ...">
+      <label for="story_body">Story text <span class="muted">(pasted text is used instead of the Reddit URL)</span></label>
+      <textarea id="story_body" rows="6" placeholder="Paste the full story here..." style="width:100%; padding:12px 14px; background:var(--bg); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:14px; margin-bottom:16px; font-family:inherit; resize:vertical;"></textarea>
+      <button id="generate">Generate video</button>
+      <div id="status" class="status"></div>
+      <div id="logbox" class="logbox" style="display:none;"></div>
+    </div>
+
+    <div class="panel videos">
+      <h2 style="font-size:16px; margin-bottom:12px;">Generated videos</h2>
+      <table id="videos-table">
+        <tbody><tr><td class="muted">No videos yet.</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    let polling = null;
+
+    const $ = (id) => document.getElementById(id);
+
+    function setStatus(text, cls) {
+      const el = $("status");
+      el.textContent = text;
+      el.className = "status" + (cls ? " " + cls : "");
+    }
+
+    function appendLog(line) {
+      const box = $("logbox");
+      box.style.display = "block";
+      const div = document.createElement("div");
+      if (line.startsWith("ERROR")) div.className = "err";
+      div.textContent = line;
+      box.appendChild(div);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    async function loadVideos() {
+      try {
+        const res = await fetch("/api/videos");
+        const vids = await res.json();
+        const tbody = $("videos-table").querySelector("tbody");
+        if (!vids.length) {
+          tbody.innerHTML = '<tr><td class="muted">No videos yet.</td></tr>';
+          return;
+        }
+        tbody.innerHTML = "";
+        for (const v of vids) {
+          const tr = document.createElement("tr");
+          const td1 = document.createElement("td");
+          const a = document.createElement("a");
+          a.href = "/results/" + v.path.replace(/^results\//, "");
+          a.textContent = "▶ " + v.name;
+          td1.appendChild(a);
+          const td2 = document.createElement("td");
+          td2.className = "muted";
+          td2.textContent = Math.round(v.size / (1024 * 1024)) + " MB";
+          tr.appendChild(td1);
+          tr.appendChild(td2);
+          tbody.appendChild(tr);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function poll(jobId) {
+      const res = await fetch("/api/status/" + jobId);
+      const data = await res.json();
+      const box = $("logbox");
+      const known = box.querySelectorAll("div").length;
+      for (let i = known; i < data.logs.length; i++) appendLog(data.logs[i]);
+      if (data.status === "done") {
+        setStatus("✓ Video generated!", "done");
+        appendLog("Done — refresh below to download.");
+        stopPolling();
+        loadVideos();
+        $("generate").disabled = false;
+      } else if (data.status === "error") {
+        setStatus("✗ Failed: " + (data.error || "unknown error"), "error");
+        stopPolling();
+        $("generate").disabled = false;
+      } else {
+        setStatus(data.status === "running" ? "Working…" : data.status, "running");
+      }
+    }
+
+    function stopPolling() {
+      if (polling) { clearInterval(polling); polling = null; }
+    }
+
+    $("generate").addEventListener("click", async () => {
+      const redditUrl = $("reddit_url").value.trim();
+      const youtubeUrl = $("youtube_url").value.trim();
+      const storyTitle = $("story_title").value.trim();
+      const storyBody = $("story_body").value.trim();
+      if (!redditUrl && !storyBody) { setStatus("Enter a Reddit URL or paste story text.", "error"); return; }
+      stopPolling();
+      $("logbox").innerHTML = "";
+      $("logbox").style.display = "none";
+      setStatus("Starting…", "running");
+      $("generate").disabled = true;
+      try {
+        const res = await fetch("/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reddit_url: redditUrl, youtube_url: youtubeUrl, story_title: storyTitle, story_body: storyBody }),
+        });
+        const data = await res.json();
+        if (data.error) { setStatus("✗ " + data.error, "error"); $("generate").disabled = false; return; }
+        setStatus("Queued. Working…", "running");
+        polling = setInterval(() => poll(data.job_id), 2000);
+      } catch (e) {
+        setStatus("✗ Request failed: " + e.message, "error");
+        $("generate").disabled = false;
+      }
+    });
+
+    loadVideos();
+  </script>
+</body>
+</html>
